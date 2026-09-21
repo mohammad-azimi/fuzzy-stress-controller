@@ -1,96 +1,54 @@
+"""Evaluate the nine representative fuzzy-rule scenarios."""
+
+from __future__ import annotations
+
+import argparse
 import csv
-from pathlib import Path
+from collections.abc import Sequence
+from typing import TypedDict
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from main import calculate_feedback
-from main import determine_feedback_label
+from main import RESULTS_DIRECTORY, calculate_feedback, determine_feedback_label
+
+LEVEL_NAMES = ("Low", "Medium", "High")
+LEVEL_VALUES = (1.0, 5.0, 9.0)
 
 
-# --------------------------------------------------
-# 1. Results directory
-# --------------------------------------------------
+class ScenarioResult(TypedDict):
+    """One representative controller evaluation."""
 
-RESULTS_DIRECTORY = Path("results")
-RESULTS_DIRECTORY.mkdir(exist_ok=True)
-
-
-# Representative values for low, medium, and high
-LEVEL_NAMES = (
-    "Low",
-    "Medium",
-    "High",
-)
-
-LEVEL_VALUES = (
-    1.0,
-    5.0,
-    9.0,
-)
+    scenario: str
+    stress: float
+    arousal: float
+    feedback_intensity: float
+    category: str
 
 
-# --------------------------------------------------
-# 2. Evaluate all nine rule scenarios
-# --------------------------------------------------
+def evaluate_scenarios() -> list[ScenarioResult]:
+    """Evaluate all nine low, medium, and high input combinations."""
 
-def evaluate_scenarios() -> list[
-    dict[str, str | float]
-]:
-    """Evaluate all nine representative scenarios."""
-
-    results = []
-
-    for stress_name, stress_value in zip(
-        LEVEL_NAMES,
-        LEVEL_VALUES,
-    ):
-        for arousal_name, arousal_value in zip(
-            LEVEL_NAMES,
-            LEVEL_VALUES,
-        ):
-            feedback_value = calculate_feedback(
-                stress_value,
-                arousal_value,
-            )
-
-            category = determine_feedback_label(
-                feedback_value
-            ).capitalize()
-
+    results: list[ScenarioResult] = []
+    for stress_name, stress_value in zip(LEVEL_NAMES, LEVEL_VALUES):
+        for arousal_name, arousal_value in zip(LEVEL_NAMES, LEVEL_VALUES):
+            feedback_value = calculate_feedback(stress_value, arousal_value)
             results.append(
                 {
-                    "scenario": (
-                        f"{stress_name} stress / "
-                        f"{arousal_name} arousal"
-                    ),
+                    "scenario": f"{stress_name} stress / {arousal_name} arousal",
                     "stress": stress_value,
                     "arousal": arousal_value,
-                    "feedback_intensity": round(
-                        feedback_value,
-                        2,
-                    ),
-                    "category": category,
+                    "feedback_intensity": round(feedback_value, 2),
+                    "category": determine_feedback_label(feedback_value).capitalize(),
                 }
             )
-
     return results
 
 
-# --------------------------------------------------
-# 3. Save results to CSV
-# --------------------------------------------------
-
-def save_results_to_csv(
-    results: list[dict[str, str | float]],
-) -> None:
+def save_results_to_csv(results: list[ScenarioResult]) -> None:
     """Save scenario results to a CSV file."""
 
-    output_path = (
-        RESULTS_DIRECTORY
-        / "scenario_comparison.csv"
-    )
-
+    output_path = RESULTS_DIRECTORY / "scenario_comparison.csv"
     fieldnames = (
         "scenario",
         "stress",
@@ -98,94 +56,40 @@ def save_results_to_csv(
         "feedback_intensity",
         "category",
     )
-
-    with output_path.open(
-        "w",
-        newline="",
-        encoding="utf-8",
-    ) as csv_file:
+    with output_path.open("w", newline="", encoding="utf-8") as csv_file:
         writer = csv.DictWriter(
             csv_file,
             fieldnames=fieldnames,
+            lineterminator="\n",
         )
-
         writer.writeheader()
         writer.writerows(results)
+    print(f"CSV results saved to: results/{output_path.name}")
 
-    print(
-        f"CSV results saved to: {output_path}"
-    )
-
-
-# --------------------------------------------------
-# 4. Create comparison heatmap
-# --------------------------------------------------
 
 def create_comparison_heatmap(
-    results: list[dict[str, str | float]],
+    results: list[ScenarioResult], show_plot: bool = True
 ) -> None:
-    """Create a heatmap of the nine scenarios."""
+    """Create and save a heatmap of the nine scenarios."""
 
     intensity_matrix = np.array(
-        [
-            float(result["feedback_intensity"])
-            for result in results
-        ]
+        [result["feedback_intensity"] for result in results]
     ).reshape(3, 3)
+    category_matrix = np.array([result["category"] for result in results]).reshape(3, 3)
 
-    category_matrix = np.array(
-        [
-            str(result["category"])
-            for result in results
-        ]
-    ).reshape(3, 3)
-
-    figure, axis = plt.subplots(
-        figsize=(9, 7)
-    )
-
-    heatmap = axis.imshow(
-        intensity_matrix,
-        cmap="RdYlGn_r",
-        vmin=0,
-        vmax=100,
-    )
-
-    axis.set_xticks(
-        range(3),
-        LEVEL_NAMES,
-    )
-
-    axis.set_yticks(
-        range(3),
-        LEVEL_NAMES,
-    )
-
+    figure, axis = plt.subplots(figsize=(9, 7))
+    heatmap = axis.imshow(intensity_matrix, cmap="RdYlGn_r", vmin=0, vmax=100)
+    axis.set_xticks(range(3), LEVEL_NAMES)
+    axis.set_yticks(range(3), LEVEL_NAMES)
     axis.set_xlabel("Arousal Level")
     axis.set_ylabel("Stress Level")
-
-    axis.set_title(
-        "Feedback Intensity for Nine "
-        "Fuzzy-Rule Scenarios"
-    )
+    axis.set_title("Feedback Intensity for Nine Fuzzy-Rule Scenarios")
 
     for row in range(3):
         for column in range(3):
-            intensity = intensity_matrix[
-                row,
-                column,
-            ]
-
-            category = category_matrix[
-                row,
-                column,
-            ]
-
-            if intensity < 25 or intensity > 75:
-                text_color = "white"
-            else:
-                text_color = "black"
-
+            intensity = intensity_matrix[row, column]
+            category = category_matrix[row, column]
+            text_color = "white" if intensity < 25 or intensity > 75 else "black"
             axis.text(
                 column,
                 row,
@@ -196,86 +100,61 @@ def create_comparison_heatmap(
                 fontweight="bold",
             )
 
-    colorbar = figure.colorbar(
-        heatmap,
-        ax=axis,
-    )
-
-    colorbar.set_label(
-        "Feedback Intensity (%)"
-    )
-
+    colorbar = figure.colorbar(heatmap, ax=axis)
+    colorbar.set_label("Feedback Intensity (%)")
     figure.tight_layout()
 
-    output_path = (
-        RESULTS_DIRECTORY
-        / "scenario_comparison.png"
-    )
+    output_path = RESULTS_DIRECTORY / "scenario_comparison.png"
+    figure.savefig(output_path, dpi=300, bbox_inches="tight")
+    print(f"Comparison plot saved to: results/{output_path.name}")
 
-    figure.savefig(
-        output_path,
-        dpi=300,
-        bbox_inches="tight",
-    )
-
-    print(
-        f"Comparison plot saved to: "
-        f"{output_path}"
-    )
-
-    plt.show()
+    if show_plot:
+        plt.show()
+    else:
+        plt.close(figure)
 
 
-# --------------------------------------------------
-# 5. Print results in the terminal
-# --------------------------------------------------
-
-def print_results(
-    results: list[dict[str, str | float]],
-) -> None:
-    """Print a formatted results table."""
+def print_results(results: list[ScenarioResult]) -> None:
+    """Print a formatted table of scenario results."""
 
     print("\n" + "=" * 78)
-    print(
-        "NINE-SCENARIO FUZZY "
-        "CONTROLLER COMPARISON"
-    )
+    print("NINE-SCENARIO FUZZY CONTROLLER COMPARISON")
     print("=" * 78)
-
-    print(
-        f"{'Scenario':<34}"
-        f"{'Stress':>9}"
-        f"{'Arousal':>10}"
-        f"{'Output':>12}"
-        f"{'Category':>12}"
-    )
-
+    print(f"{'Scenario':<34}{'Stress':>9}{'Arousal':>10}{'Output':>12}{'Category':>12}")
     print("-" * 78)
-
     for result in results:
         print(
-            f"{str(result['scenario']):<34}"
-            f"{float(result['stress']):>9.1f}"
-            f"{float(result['arousal']):>10.1f}"
-            f"{float(result['feedback_intensity']):>11.2f}%"
-            f"{str(result['category']):>12}"
+            f"{result['scenario']:<34}"
+            f"{result['stress']:>9.1f}"
+            f"{result['arousal']:>10.1f}"
+            f"{result['feedback_intensity']:>11.2f}%"
+            f"{result['category']:>12}"
         )
-
     print("=" * 78)
 
 
-# --------------------------------------------------
-# 6. Start the experiment
-# --------------------------------------------------
+def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse display options."""
 
-def main() -> None:
-    """Run all nine comparison scenarios."""
+    parser = argparse.ArgumentParser(
+        description="Evaluate the nine representative fuzzy-controller scenarios."
+    )
+    parser.add_argument(
+        "--no-show",
+        action="store_true",
+        help="save the heatmap without opening a graphical window",
+    )
+    return parser.parse_args(argv)
 
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Run the scenario experiment."""
+
+    arguments = parse_arguments(argv)
     results = evaluate_scenarios()
-
     print_results(results)
     save_results_to_csv(results)
-    create_comparison_heatmap(results)
+    create_comparison_heatmap(results, show_plot=not arguments.no_show)
 
 
 if __name__ == "__main__":
