@@ -1,0 +1,9 @@
+scenario,stress,arousal,baseline_output,baseline_category,modified_output,modified_category,difference
+Lower transition,3.0,3.0,33.91,Moderate,42.06,Moderate,8.15
+Central state,5.0,5.0,50.0,Moderate,50.0,Moderate,0.0
+Rising both,5.5,5.5,50.0,Moderate,56.93,Moderate,6.93
+Stress dominant,6.0,4.0,50.0,Moderate,63.43,Moderate,13.43
+Arousal dominant,4.0,6.0,50.0,Moderate,63.43,Moderate,13.43
+Elevated both,6.0,6.0,50.0,Moderate,63.43,Moderate,13.43
+Upper transition,7.0,7.0,66.09,Moderate,77.22,Strong,11.12
+Previous example,8.0,7.0,84.86,Strong,86.83,Strong,1.97
